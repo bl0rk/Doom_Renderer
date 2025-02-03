@@ -1,0 +1,1 @@
+- Change project name to something like software_renderer.
