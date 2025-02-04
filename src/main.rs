@@ -3,11 +3,13 @@ extern crate sdl2;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
-use sdl2::rect::Point;
+use sdl2::rect::{Point, Rect};
 use sdl2::render::Canvas;
 use sdl2::video::Window;
-use std::ops;
 use std::time::Duration;
+
+mod data;
+use data::{Vec2, PlayerData};
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 600;
@@ -20,45 +22,12 @@ const GAME_MAP: [[i32; 5]; 5] = [
     [1, 1, 1, 1, 1]
 ];
 
-pub struct Vec2 {
-    pub x: f32,
-    pub y: f32
-}
-
-impl Vec2 {
-    pub fn new(x: f32, y: f32) -> Vec2 {
-        Vec2 { x, y }
-    }
-
-    pub fn len(self: &Self) -> f32 {
-        (self.x.powi(2) + self.y.powi(2)).sqrt()
-    }
-}
-
-impl ops::Mul<f32> for Vec2 {
-    type Output = Self;
-
-    fn mul(self: Self, rhs: f32) -> Self::Output {
-        Vec2 {
-            x: self.x * rhs,
-            y: self.y * rhs
-        }
-    }
-}
-
-impl ops::MulAssign<f32> for Vec2 {
-    fn mul_assign(&mut self, rhs: f32) {
-        self.x *= rhs;
-        self.y *= rhs;
-    }
-}
-
 pub fn ver_line(x: i32, y: i32, length: i32, color: Color, canvas: &mut Canvas<Window>) {
     canvas.set_draw_color(color);
     let _ = canvas.draw_line(Point::new(x, y), Point::new(x, y+length));
 }
 
-pub fn cast_ray3(pos_vec: Vec2, dir_vec: Vec2) {
+pub fn cast_ray3(pos_vec: &Vec2, dir_vec: &Vec2) -> (f32, bool) {
     let mut map_x: i32 = pos_vec.x.floor() as i32;
     let mut map_y: i32 = pos_vec.y.floor() as i32;
 
@@ -88,25 +57,27 @@ pub fn cast_ray3(pos_vec: Vec2, dir_vec: Vec2) {
     let delta_x = if dir_vec.x == 0.0 {side_dist_x += f32::MAX; 0.0} else {(1.0 + (dir_vec.y.powi(2)/dir_vec.x.powi(2))).sqrt()};
     let delta_y = if dir_vec.y == 0.0 {side_dist_y += f32::MAX; 0.0} else {(1.0 + (dir_vec.x.powi(2)/dir_vec.y.powi(2))).sqrt()};
 
+    let mut hit_x = true;
+
     loop {
         if side_dist_x < side_dist_y {
             side_dist_x += delta_x;
             map_x += step_x;
+            hit_x = true;
         } else {
             side_dist_y += delta_y;
             map_y += step_y;
+            hit_x = false;
         }
 
         // Check for collision.
         if GAME_MAP[map_y as usize][map_x as usize] != 0 {
-            return;
+            return if hit_x {(side_dist_x, hit_x)} else {(side_dist_y, hit_x)};
         }
     }
 }
 
 pub fn main() -> Result<(), String> {
-    cast_ray3(Vec2::new(1.7, 3.0), Vec2::new(1.0, -1.0));
-
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
@@ -126,7 +97,12 @@ pub fn main() -> Result<(), String> {
     canvas.present();
     let mut event_pump = sdl_context.event_pump()?;
 
-    let mut cube_size = 20;
+    // Game Setup
+    let mut player = PlayerData::new(
+        Vec2::new(1.7, 3.0),
+        Vec2::new(1.0, 0.0),
+        Vec2::new(0.0, 0.5)
+    );
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -136,39 +112,34 @@ pub fn main() -> Result<(), String> {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
-                Event::KeyDown {
-                    keycode: Some(Keycode::D),
-                    ..
-                } => cube_size += 5,
-                Event::KeyDown {
-                    keycode: Some(Keycode::A),
-                    ..
-                } => {
-                    if cube_size > 5 {
-                        cube_size -= 5
-                    }
-                },
                 _ => {}
             }
         }
 
         canvas.set_draw_color(Color::RGB(255, 0, 0));
         canvas.clear();
+        canvas.set_draw_color(Color::MAGENTA);
+        let half_height: u32 = HEIGHT/2;
+        canvas.fill_rect(Rect::new(0, 0, WIDTH, half_height))?;
+        canvas.set_draw_color(Color::BLACK);
+        canvas.fill_rect(Rect::new(0, half_height as i32, WIDTH, half_height))?;
 
-        let mut vertical_start = true;
-        let mut current = true;
-
+        // Draw Walls
         for x in 0..WIDTH as i32 {
-            if x%cube_size as i32 == 0  {
-                vertical_start = !vertical_start;
-            }
+            let cam_pos: f32 = (2.0*x as f32)/(WIDTH as f32)-1.0;
+            let (hit_distance, hit_x) = cast_ray3(
+                &player.pos,
+                // Multiply the camera by the cam_pos and add it to the direction vector.
+                &player.dir.refadd(player.cam.refmul(cam_pos))
+            );
 
-            current = vertical_start;
+            println!("{cam_pos}");
+            println!("{x}");
+            println!("{hit_distance}");
 
-            for y in 0..(HEIGHT as i32/cube_size)+1 {
-                ver_line(x, cube_size*y, cube_size, if current {Color::RGB(255, 255, 255)} else {Color::RGB(0, 0, 0)}, &mut canvas);
-                current = !current;
-            }
+            let line_height = HEIGHT as i32 / (hit_distance+1.0) as i32;
+
+            ver_line(x, 0, line_height, if hit_x {Color::WHITE} else {Color::GRAY}, &mut canvas);
         }
 
         canvas.present();
