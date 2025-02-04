@@ -58,35 +58,55 @@ pub fn ver_line(x: i32, y: i32, length: i32, color: Color, canvas: &mut Canvas<W
     let _ = canvas.draw_line(Point::new(x, y), Point::new(x, y+length));
 }
 
-pub fn cast_ray(posx: f32, posy: f32, dirx: f32, diry: f32) {
-    // nextx; nexty; deltax; deltay;
-    let mut next_x = Vec2::new(dirsx, diry);
-    let mut next_y = Vec2::new(dirx, diry);
+pub fn cast_ray3(pos_vec: Vec2, dir_vec: Vec2) {
+    let mut map_x: i32 = pos_vec.x.floor() as i32;
+    let mut map_y: i32 = pos_vec.y.floor() as i32;
 
-    let dir_vec2 = Vec2::new(dirx, diry);
+    let step_x: i32 = if dir_vec.x > 0.0 {1} else {-1};
+    let step_y: i32 = if dir_vec.y > 0.0 {1} else {-1};
 
-    next_x *= if dirx > 0.0 {posx.ceil()/dirx} else {posx.floor()/dirx};
-    next_y *= if diry > 0.0 {posy.ceil()/diry} else {posy.floor()/diry};
+    // These need to be the vector lengths.
+    
+    // Get the length of the vector that collides with the next x or y axis.
+    let mut side_dist_x: f32 = {
+        // Get scalar to multiply the direction vector by.
+        let c = (if dir_vec.x > 0.0 {pos_vec.x.ceil()} else {pos_vec.x.floor()}/dir_vec.x);
+        // Calculate the length of the vector.
+        ((dir_vec.x*c).powi(2) + (dir_vec.y*c).powi(2)).sqrt()
+    };
 
-    let mut delta_x: f32 = 0.0;
-    let mut delta_y: f32 = 0.0;
+    let mut side_dist_y: f32 = {
+        let c = (if dir_vec.y > 0.0 {pos_vec.y.ceil()} else {pos_vec.y.floor()}/dir_vec.y);
+        ((dir_vec.x*c).powi(2) + (dir_vec.y*c).powi(2)).sqrt()
+    };
 
-    delta_x = if dirx > 0.0 {(posx+next_x.x+1)/dirx} else {(posx+next_x.x-1)/dirx};
-    delta_y = if diry > 0.0 {(posy+next_y.y+1)/dirx} else {(posy+next_y.y-1)/dirx};
-
-    // Check both next, then when checking the delta ones go along one axis until the distance from
-    // the player exceeds the distance from the next one on the other axis.
+    // let mut side_dist_x: f32 = if dir_vec.x > 0.0 {pos_vec.x.ceil()-pos_vec.x} else {pos_vec.x-pos_vec.x.floor()};
+    // let mut side_dist_y:f32 = if dir_vec.y > 0.0 {pos_vec.y.ceil()-pos_vec.y} else {pos_vec.y-pos_vec.y.floor()};
+    
+    // The distance between each new collission on either the x or y axis. If zero it will always
+    // collide so make it impossible for it to be checked.
+    let delta_x = if dir_vec.x == 0.0 {side_dist_x += f32::MAX; 0.0} else {(1.0 + (dir_vec.y.powi(2)/dir_vec.x.powi(2))).sqrt()};
+    let delta_y = if dir_vec.y == 0.0 {side_dist_y += f32::MAX; 0.0} else {(1.0 + (dir_vec.x.powi(2)/dir_vec.y.powi(2))).sqrt()};
 
     loop {
-        if (next_x.len() < next_y.len()) {
-            // Check for collission
+        if side_dist_x < side_dist_y {
+            side_dist_x += delta_x;
+            map_x += step_x;
+        } else {
+            side_dist_y += delta_y;
+            map_y += step_y;
+        }
 
-            next_x *= delta_x;
+        // Check for collision.
+        if GAME_MAP[map_y as usize][map_x as usize] != 0 {
+            return;
         }
     }
 }
 
 pub fn main() -> Result<(), String> {
+    cast_ray3(Vec2::new(1.7, 3.0), Vec2::new(1.0, -1.0));
+
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
