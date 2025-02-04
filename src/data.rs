@@ -27,6 +27,12 @@ impl Vec2 {
             y: self.y + rhs.y
         }
     }
+
+    pub fn rotate(&mut self, degrees: f32) {
+        let old_x = self.x;
+        self.x = self.x * (-degrees).cos() - self.y * (-degrees).sin();
+        self.y = old_x * (-degrees).sin() + self.y * (-degrees).cos();
+    }
 }
 
 impl ops::Mul<f32> for Vec2 {
