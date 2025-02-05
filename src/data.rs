@@ -28,10 +28,16 @@ impl Vec2 {
         }
     }
 
-    pub fn rotate(&mut self, degrees: f32) {
+    pub fn rotate_right(&mut self, degrees: f32) {
         let old_x = self.x;
         self.x = self.x * (-degrees).cos() - self.y * (-degrees).sin();
         self.y = old_x * (-degrees).sin() + self.y * (-degrees).cos();
+    }
+
+    pub fn rotate_left(&mut self, degrees: f32) {
+        let old_x = self.x;
+        self.x = self.x * (degrees).cos() - self.y * (degrees).sin();
+        self.y = old_x * (degrees).sin() + self.y * (degrees).cos();
     }
 }
 
